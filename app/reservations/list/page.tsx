@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type User = {
@@ -13,23 +13,25 @@ type Reservation = {
   date: string;
   time: string;
   status: string;
-  complaint: string;
+  complaint: string | null;
   doctor_name: string;
   specialty: string;
 };
 
-export default function ReservationListPage() {
+export default function ReservationListPage(): JSX.Element | null {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<"Aktif" | "Selesai" | "Batal">("Aktif");
   const [items, setItems] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(false);
-  const [updatingId, setUpdatingId] = useState<number | null>(null);
 
-  const [detailData, setDetailData] = useState<Reservation | null>(null);
-  const [confirmCancel, setConfirmCancel] = useState<Reservation | null>(null);
+  const [detail, setDetail] = useState<Reservation | null>(null);
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const router = useRouter();
 
+  // cek login pasien
   useEffect(() => {
     const saved = localStorage.getItem("user");
     if (!saved) {
@@ -39,30 +41,45 @@ export default function ReservationListPage() {
     setUser(JSON.parse(saved));
   }, [router]);
 
-  const reload = async (u: User, s: "Aktif" | "Selesai" | "Batal") => {
-    setLoading(true);
-    try {
-      const url = new URL("http://localhost:5000/api/reservations");
-      url.searchParams.set("userId", String(u.id));
-      url.searchParams.set("status", s);
-      const res = await fetch(url.toString());
-      const data = await res.json();
-      setItems(data);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // ambil data reservasi sesuai status
   useEffect(() => {
     if (!user) return;
-    reload(user, status);
+
+    const load = async () => {
+      try {
+        setLoading(true);
+        const params = new URLSearchParams();
+        params.set("userId", String(user.id));
+        if (status) params.set("status", status);
+
+        const res = await fetch(
+          `http://localhost:5000/api/reservations?${params.toString()}`
+        );
+        const data = await res.json();
+        setItems(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, [user, status]);
 
+  if (!user) return null;
+
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString("id-ID", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
+  const formatTime = (isoTime: string) => isoTime.slice(0, 5) + " WIB";
+
+  // ubah status ke "Batal"
   const handleCancel = async (id: number) => {
-    if (!user) return;
-    setUpdatingId(id);
     try {
       const res = await fetch(`http://localhost:5000/api/reservations/${id}`, {
         method: "PATCH",
@@ -75,286 +92,362 @@ export default function ReservationListPage() {
         return;
       }
 
-      setConfirmCancel(null);
-      await reload(user, status);
+      const updated = await res.json();
+      setItems((prev) =>
+        prev.map((r) => (r.id === updated.id ? { ...r, status: updated.status } : r))
+      );
+
+      setDetail((prev) =>
+        prev && prev.id === updated.id ? { ...prev, status: updated.status } : prev
+      );
     } catch (err) {
       console.error(err);
-    } finally {
-      setUpdatingId(null);
     }
   };
 
-  if (!user) return null;
+  // buka modal konfirmasi hapus
+  const handleAskDelete = (id: number) => {
+    setConfirmDeleteId(id);
+  };
 
-  const tabStyle = (s: "Aktif" | "Selesai" | "Batal"): React.CSSProperties => ({
-    flex: 1,
-    textAlign: "center",
-    padding: 8,
-    marginRight: 6,
-    borderRadius: 10,
-    border: status === s ? "2px solid white" : "1px solid white",
-    cursor: "pointer",
-    fontSize: 14,
-    backgroundColor: status === s ? "white" : "transparent",
-    color: status === s ? "black" : "white",
-  });
+  // eksekusi hapus setelah user klik "Hapus" di modal
+  const handleConfirmDelete = async () => {
+    if (confirmDeleteId == null) return;
+
+    try {
+      setDeleting(true);
+
+      const res = await fetch(
+        `http://localhost:5000/api/reservations/${confirmDeleteId}`,
+        { method: "DELETE" }
+      );
+
+      if (!res.ok) {
+        console.error("Gagal menghapus reservasi");
+        setDeleting(false);
+        return;
+      }
+
+      // buang kartu dari list
+      setItems((prev) => prev.filter((r) => r.id !== confirmDeleteId));
+
+      // kalau detail yang kebuka barusan dihapus, tutup
+      setDetail((prev) =>
+        prev && prev.id === confirmDeleteId ? null : prev
+      );
+
+      setDeleting(false);
+      setConfirmDeleteId(null);
+    } catch (err) {
+      console.error(err);
+      setDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    if (deleting) return;
+    setConfirmDeleteId(null);
+  };
 
   return (
-    <>
-      <div style={{ padding: 16, maxWidth: 400, margin: "0 auto" }}>
-        <h2 style={{ marginBottom: 16, color: "white" }}>Daftar Reservasi</h2>
-
-        <div style={{ display: "flex", marginBottom: 16 }}>
-          <div style={tabStyle("Aktif")} onClick={() => setStatus("Aktif")}>
-            Aktif
-          </div>
-          <div
-            style={tabStyle("Selesai")}
-            onClick={() => setStatus("Selesai")}
-          >
-            Selesai
-          </div>
-          <div style={tabStyle("Batal")} onClick={() => setStatus("Batal")}>
-            Batal
-          </div>
-        </div>
-
-        <p style={{ marginBottom: 8, color: "white" }}>Reservasi Anda</p>
-
-        {loading && (
-          <p style={{ fontSize: 12, color: "#ccc" }}>Memuat data…</p>
-        )}
-
-        {!loading &&
-          items.map((r) => {
-            const tanggal = new Date(r.date).toLocaleDateString("id-ID", {
-              day: "2-digit",
-              month: "long",
-              year: "numeric",
-            });
-            const jam = r.time?.slice(0, 5) || "";
-
-            return (
-              <div
-                key={r.id}
-                style={{
-                  padding: 12,
-                  marginBottom: 10,
-                  borderRadius: 10,
-                  border: "1px solid #ddd",
-                  backgroundColor: "white",
-                  color: "#000",
-                }}
-              >
-                <div
-                  style={{ fontWeight: "bold", fontSize: 15, color: "#000" }}
-                >
-                  {r.doctor_name}
-                </div>
-
-                <div style={{ fontSize: 13, color: "#333" }}>
-                  {r.specialty}
-                </div>
-
-                <div
-                  style={{ fontSize: 13, marginTop: 6, color: "#000" }}
-                >{`${tanggal} – ${jam} WIB`}</div>
-
-                <div style={{ fontSize: 13, marginTop: 2, color: "#000" }}>
-                  Status: {r.status}
-                </div>
-
-                {r.complaint && (
-                  <div
-                    style={{ fontSize: 13, marginTop: 6, color: "#000" }}
-                  >
-                    Keluhan: {r.complaint}
-                  </div>
-                )}
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: 8,
-                    marginTop: 10,
-                  }}
-                >
-                  <button
-                    onClick={() => setDetailData(r)}
-                    style={{
-                      flex: 1,
-                      padding: 6,
-                      borderRadius: 999,
-                      border: "1px solid #000",
-                      background: "white",
-                      cursor: "pointer",
-                      fontSize: 12,
-                    }}
-                  >
-                    Lihat Detail
-                  </button>
-
-                  {r.status === "Aktif" && (
-                    <button
-                      onClick={() => setConfirmCancel(r)}
-                      disabled={updatingId === r.id}
-                      style={{
-                        flex: 1,
-                        padding: 6,
-                        borderRadius: 999,
-                        border: "none",
-                        background: "black",
-                        color: "white",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        opacity: updatingId === r.id ? 0.7 : 1,
-                      }}
-                    >
-                      {updatingId === r.id ? "Memproses..." : "Batalkan"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-        {!loading && items.length === 0 && (
-          <p style={{ fontSize: 12, color: "#ccc" }}>
-            Belum ada reservasi dengan status ini.
-          </p>
-        )}
-      </div>
-
-      {detailData && (
-  <div
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(0,0,0,0.6)",
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 20,
-    }}
-  >
     <div
       style={{
-        background: "white",
-        padding: 20,
-        width: 320,
-        borderRadius: 12,
-        color: "#000",
+        minHeight: "100vh",
+        paddingTop: 80,
+        paddingBottom: 40,
+        display: "flex",
+        justifyContent: "center",
+        color: "white",
       }}
     >
-      <h3 style={{ marginBottom: 10 }}>Detail Reservasi</h3>
-
-      <p>
-        <b>Dokter:</b> {detailData.doctor_name}
-      </p>
-      <p>
-        <b>Spesialis:</b> {detailData.specialty}
-      </p>
-
-      <p>
-        <b>Tanggal:</b>{" "}
-        {new Date(detailData.date).toLocaleDateString("id-ID", {
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-        })}
-      </p>
-
-      <p>
-        <b>Waktu:</b> {detailData.time.slice(0, 5)} WIB
-      </p>
-
-      <p>
-        <b>Status:</b> {detailData.status}
-      </p>
-
-      <p>
-        <b>Keluhan:</b> {detailData.complaint || "-"}
-      </p>
-
-      <button
-        onClick={() => setDetailData(null)}
-        style={{
-          marginTop: 15,
-          width: "100%",
-          padding: 8,
-          borderRadius: 20,
-          border: "none",
-          background: "black",
-          color: "white",
-          cursor: "pointer",
-        }}
-      >
-        Tutup
-      </button>
-    </div>
-  </div>
-)}
-
-
-      {confirmCancel && (
-        <div
+      <div style={{ width: "100%", maxWidth: 600, padding: "0 16px" }}>
+        <h1
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 20,
+            fontSize: 20,
+            fontWeight: "bold",
+            textAlign: "center",
+            marginBottom: 16,
           }}
         >
+          Daftar Reservasi
+        </h1>
+
+        {/* tombol filter status */}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            justifyContent: "center",
+            marginBottom: 16,
+          }}
+        >
+          {(["Aktif", "Selesai", "Batal"] as const).map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatus(s)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 999,
+                border: "none",
+                cursor: "pointer",
+                backgroundColor: status === s ? "white" : "transparent",
+                color: status === s ? "black" : "white",
+              }}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
+        <h2
+          style={{
+            fontSize: 16,
+            marginBottom: 8,
+          }}
+        >
+          Reservasi Anda
+        </h2>
+
+        {loading && (
+          <p style={{ fontSize: 12, color: "#ccc" }}>Memuat data...</p>
+        )}
+
+        {!loading && items.length === 0 && (
+          <p style={{ fontSize: 13, color: "#ccc" }}>
+            Belum ada reservasi dengan status {status}.
+          </p>
+        )}
+
+        {/* kartu reservasi */}
+        {!loading &&
+          items.map((r) => (
+            <div
+              key={r.id}
+              style={{
+                backgroundColor: "white",
+                color: "black",
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 12,
+              }}
+            >
+              <div style={{ fontWeight: "bold", marginBottom: 4 }}>
+                Dr. {r.doctor_name}
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>{r.specialty}</div>
+              <div style={{ fontSize: 12, marginBottom: 2 }}>
+                {formatDate(r.date)} — {formatTime(r.time)}
+              </div>
+              <div style={{ fontSize: 12, marginBottom: 2 }}>
+                <span style={{ fontWeight: "bold" }}>Status:</span> {r.status}
+              </div>
+              {r.complaint && (
+                <div style={{ fontSize: 12, marginBottom: 8 }}>
+                  <span style={{ fontWeight: "bold" }}>Keluhan:</span> {r.complaint}
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  justifyContent: "flex-end",
+                  marginTop: 8,
+                }}
+              >
+                <button
+                  onClick={() => setDetail(r)}
+                  style={{
+                    padding: "6px 16px",
+                    borderRadius: 999,
+                    border: "1px solid #ccc",
+                    backgroundColor: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Lihat Detail
+                </button>
+
+                {r.status === "Aktif" && (
+                  <button
+                    onClick={() => handleCancel(r.id)}
+                    style={{
+                      padding: "6px 16px",
+                      borderRadius: 999,
+                      border: "none",
+                      backgroundColor: "black",
+                      color: "white",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Batalkan
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleAskDelete(r.id)}
+                  style={{
+                    padding: "6px 16px",
+                    borderRadius: 999,
+                    border: "none",
+                    backgroundColor: "#b91c1c",
+                    color: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Hapus
+                </button>
+              </div>
+            </div>
+          ))}
+
+        {/* MODAL DETAIL */}
+        {detail && (
           <div
             style={{
-              background: "white",
-              padding: 20,
-              width: 300,
-              borderRadius: 12,
-              color: "#000",
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 20,
             }}
           >
-            <h3>Batalkan Reservasi?</h3>
-            <p>
-              Dokter: <b>{confirmCancel.doctor_name}</b>
-            </p>
-
-            <div style={{ display: "flex", gap: 10, marginTop: 15 }}>
-              <button
-                onClick={() => handleCancel(confirmCancel.id)}
+            <div
+              style={{
+                width: 360,
+                backgroundColor: "white",
+                borderRadius: 16,
+                padding: 20,
+                color: "black",
+              }}
+            >
+              <h3
                 style={{
-                  flex: 1,
-                  padding: 8,
-                  borderRadius: 20,
-                  border: "none",
-                  background: "black",
-                  color: "white",
-                  cursor: "pointer",
+                  fontWeight: "bold",
+                  fontSize: 18,
+                  marginBottom: 8,
                 }}
               >
-                Ya, Batalkan
-              </button>
+                Detail Reservasi
+              </h3>
+              <p style={{ fontSize: 13, marginBottom: 4 }}>
+                <strong>Dokter:</strong> Dr. {detail.doctor_name}
+              </p>
+              <p style={{ fontSize: 13, marginBottom: 4 }}>
+                <strong>Spesialis:</strong> {detail.specialty}
+              </p>
+              <p style={{ fontSize: 13, marginBottom: 4 }}>
+                <strong>Tanggal:</strong> {formatDate(detail.date)}
+              </p>
+              <p style={{ fontSize: 13, marginBottom: 4 }}>
+                <strong>Waktu:</strong> {formatTime(detail.time)}
+              </p>
+              <p style={{ fontSize: 13, marginBottom: 4 }}>
+                <strong>Status:</strong> {detail.status}
+              </p>
+              <p style={{ fontSize: 13, marginBottom: 8 }}>
+                <strong>Keluhan:</strong>{" "}
+                {detail.complaint || "Tidak ada keluhan yang dicatat"}
+              </p>
 
-              <button
-                onClick={() => setConfirmCancel(null)}
-                style={{
-                  flex: 1,
-                  padding: 8,
-                  borderRadius: 20,
-                  border: "1px solid black",
-                  background: "white",
-                  cursor: "pointer",
-                }}
-              >
-                Tidak
-              </button>
+              <div style={{ textAlign: "right", marginTop: 12 }}>
+                <button
+                  onClick={() => setDetail(null)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 999,
+                    border: "none",
+                    backgroundColor: "black",
+                    color: "white",
+                    cursor: "pointer",
+                  }}
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </>
+        )}
+
+        {/* MODAL KONFIRMASI HAPUS */}
+        {confirmDeleteId !== null && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 30,
+            }}
+          >
+            <div
+              style={{
+                width: 360,
+                backgroundColor: "white",
+                borderRadius: 16,
+                padding: 20,
+                color: "black",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.4)",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: 18,
+                  fontWeight: "bold",
+                  marginBottom: 8,
+                }}
+              >
+                Hapus Reservasi
+              </h3>
+              <p style={{ fontSize: 13, marginBottom: 16 }}>
+                Hapus reservasi ini secara permanen? Data tidak bisa dikembalikan.
+              </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 8,
+                  marginTop: 8,
+                }}
+              >
+                <button
+                  onClick={handleCancelDelete}
+                  disabled={deleting}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 999,
+                    border: "1px solid #ccc",
+                    backgroundColor: "white",
+                    cursor: deleting ? "default" : "pointer",
+                  }}
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={deleting}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 999,
+                    border: "none",
+                    backgroundColor: "#b91c1c",
+                    color: "white",
+                    cursor: deleting ? "default" : "pointer",
+                    opacity: deleting ? 0.7 : 1,
+                  }}
+                >
+                  {deleting ? "Menghapus..." : "Hapus"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
