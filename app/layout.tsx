@@ -1,7 +1,8 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
 import "./globals.css";
+import { useRouter, usePathname } from "next/navigation";
+import React from "react";
 
 export default function RootLayout({
   children,
@@ -17,7 +18,8 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body className="min-h-screen bg-black text-white relative">
-        {/* TOMBOL BACK */}
+
+        {/* Tombol Back global */}
         {!noBackButton.includes(pathname) && (
           <button
             onClick={() => router.back()}
@@ -32,7 +34,6 @@ export default function RootLayout({
           </button>
         )}
 
-        {/* ISI HALAMAN */}
         {children}
       </body>
     </html>
