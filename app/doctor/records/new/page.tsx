@@ -3,6 +3,14 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
+// Konstanta Warna (Sesuai dengan Dashboard Dokter)
+const PRIMARY_COLOR = "#ff69b4"; // Hot Pink
+const SECONDARY_COLOR = "#ffe4e1"; // Misty Rose (Pink Pucat)
+const TEXT_DARK = "#333"; // Warna Teks Hitam
+const TEXT_LIGHT = "#fff"; // Warna Background Input
+const BORDER_COLOR = "#ffc0cb"; // Light Pink
+const CARD_BG = "rgba(255, 255, 255, 0.9)"; // Background form semi-transparan putih
+
 type PrescriptionInput = {
   name: string;
   dose: string;
@@ -89,19 +97,43 @@ export default function NewRecordPage() {
     }
   };
 
+  // Style untuk Input/Textarea
+  const inputStyle: React.CSSProperties = {
+    padding: 10,
+    borderRadius: 10,
+    border: `1px solid ${BORDER_COLOR}`,
+    backgroundColor: TEXT_LIGHT,
+    color: TEXT_DARK,
+    fontSize: 14,
+    transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+    resize: "none", // Agar textarea tidak bisa di-resize
+  };
+
+  // Style untuk Input Resep
+  const prescriptionInputStyle: React.CSSProperties = {
+    padding: 8,
+    borderRadius: 8,
+    border: `1px solid ${BORDER_COLOR}`,
+    backgroundColor: TEXT_LIGHT,
+    color: TEXT_DARK,
+    fontSize: 13,
+    transition: "border-color 0.3s ease",
+  };
+
   if (!reservationId) {
     return (
       <div
         style={{
           minHeight: "100vh",
-          backgroundColor: "black",
-          color: "white",
+          background: `linear-gradient(180deg, ${SECONDARY_COLOR} 0%, #ffffff 80%)`,
+          color: TEXT_DARK,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          fontFamily: "'Poppins', 'Helvetica Neue', Helvetica, Arial, sans-serif",
         }}
       >
-        <p>Reservation ID tidak ditemukan.</p>
+        <p style={{ color: PRIMARY_COLOR, fontWeight: 600 }}>Reservation ID tidak ditemukan. ❌</p>
       </div>
     );
   }
@@ -110,65 +142,58 @@ export default function NewRecordPage() {
     <div
       style={{
         minHeight: "100vh",
-        backgroundColor: "black",
-        color: "white",
+        background: `linear-gradient(180deg, ${SECONDARY_COLOR} 0%, #ffffff 80%)`,
+        color: TEXT_DARK,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         padding: 16,
+        fontFamily: "'Poppins', 'Helvetica Neue', Helvetica, Arial, sans-serif",
       }}
     >
       <form
         onSubmit={handleSubmit}
         style={{
-          width: 360,
-          backgroundColor: "#111",
-          padding: 16,
-          borderRadius: 12,
+          width: 380,
+          backgroundColor: CARD_BG,
+          padding: 24,
+          borderRadius: 15,
           display: "flex",
           flexDirection: "column",
-          gap: 10,
+          gap: 15,
+          boxShadow: "0 8px 16px rgba(0, 0, 0, 0.15)",
         }}
       >
-        <h3 style={{ margin: 0, marginBottom: 8 }}>Isi Rekam Medis</h3>
-        <p style={{ fontSize: 12, margin: 0, marginBottom: 8 }}>
+        <h3 style={{ margin: 0, marginBottom: 4, color: PRIMARY_COLOR, fontSize: 22, fontWeight: 700 }}>
+          Isi Rekam Medis
+        </h3>
+        <p style={{ fontSize: 13, margin: 0, marginBottom: 8, borderBottom: `1px dashed ${BORDER_COLOR}`, paddingBottom: 8, color: TEXT_DARK }}>
           Pasien: {patientName || "-"} • Reservasi #{reservationId}
         </p>
 
-        <label style={{ fontSize: 12 }}>Diagnosa</label>
+        {/* Diagnosa */}
+        <label style={{ fontSize: 13, fontWeight: 600 }}>Diagnosa</label>
         <textarea
           value={diagnosis}
           onChange={(e) => setDiagnosis(e.target.value)}
-          style={{
-            minHeight: 60,
-            padding: 8,
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            backgroundColor: "white",
-            color: "black",
-          }}
+          style={{ ...inputStyle, minHeight: 80 }}
         />
 
-        <label style={{ fontSize: 12 }}>Catatan Dokter</label>
+        {/* Catatan Dokter */}
+        <label style={{ fontSize: 13, fontWeight: 600 }}>Catatan Dokter</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          style={{
-            minHeight: 60,
-            padding: 8,
-            borderRadius: 8,
-            border: "1px solid #ddd",
-            backgroundColor: "white",
-            color: "black",
-          }}
+          style={{ ...inputStyle, minHeight: 80 }}
         />
 
-        <label style={{ fontSize: 12 }}>Resep Obat</label>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {/* Resep Obat */}
+        <label style={{ fontSize: 13, fontWeight: 600 }}>Resep Obat</label>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {prescriptions.map((p, idx) => (
             <div
               key={idx}
-              style={{ display: "flex", gap: 6, alignItems: "center" }}
+              style={{ display: "flex", gap: 8, alignItems: "center" }}
             >
               <input
                 placeholder="Nama obat"
@@ -176,14 +201,7 @@ export default function NewRecordPage() {
                 onChange={(e) =>
                   handleChangePrescription(idx, "name", e.target.value)
                 }
-                style={{
-                  flex: 1,
-                  padding: 6,
-                  borderRadius: 8,
-                  border: "1px solid #ddd",
-                  backgroundColor: "white",
-                  color: "black",
-                }}
+                style={{ ...prescriptionInputStyle, flex: 1 }}
               />
               <input
                 placeholder="Dosis"
@@ -191,14 +209,7 @@ export default function NewRecordPage() {
                 onChange={(e) =>
                   handleChangePrescription(idx, "dose", e.target.value)
                 }
-                style={{
-                  width: 90,
-                  padding: 6,
-                  borderRadius: 8,
-                  border: "1px solid #ddd",
-                  backgroundColor: "white",
-                  color: "black",
-                }}
+                style={{ ...prescriptionInputStyle, width: 90 }}
               />
             </div>
           ))}
@@ -207,13 +218,15 @@ export default function NewRecordPage() {
             onClick={addRow}
             style={{
               marginTop: 4,
-              padding: 6,
-              borderRadius: 8,
-              border: "1px solid #555",
-              backgroundColor: "#111",
-              color: "white",
-              fontSize: 12,
+              padding: 8,
+              borderRadius: 10,
+              border: `1px solid ${PRIMARY_COLOR}`,
+              backgroundColor: TEXT_LIGHT,
+              color: PRIMARY_COLOR,
+              fontSize: 13,
               cursor: "pointer",
+              fontWeight: 600,
+              transition: "all 0.3s ease",
             }}
           >
             + Tambah Baris Obat
@@ -221,14 +234,17 @@ export default function NewRecordPage() {
         </div>
 
         {error && (
-          <p style={{ color: "red", fontSize: 12, marginTop: 4 }}>{error}</p>
+          <p style={{ color: PRIMARY_COLOR, fontSize: 13, marginTop: 4, fontWeight: 500 }}>
+             {error}
+          </p>
         )}
 
+        {/* Tombol Aksi (Batal & Simpan) */}
         <div
           style={{
-            marginTop: 8,
+            marginTop: 15,
             display: "flex",
-            gap: 8,
+            gap: 10,
             justifyContent: "flex-end",
           }}
         >
@@ -236,13 +252,15 @@ export default function NewRecordPage() {
             type="button"
             onClick={() => router.back()}
             style={{
-              padding: 8,
-              borderRadius: 8,
-              border: "1px solid #555",
-              backgroundColor: "#111",
-              color: "white",
-              fontSize: 12,
+              padding: 10,
+              borderRadius: 10,
+              border: `1px solid ${BORDER_COLOR}`,
+              backgroundColor: TEXT_LIGHT,
+              color: TEXT_DARK,
+              fontSize: 14,
               cursor: "pointer",
+              fontWeight: 500,
+              transition: "all 0.3s ease",
             }}
           >
             Batal
@@ -251,17 +269,19 @@ export default function NewRecordPage() {
             type="submit"
             disabled={saving}
             style={{
-              padding: 8,
-              borderRadius: 8,
+              padding: 10,
+              borderRadius: 10,
               border: "none",
-              backgroundColor: "white",
-              color: "black",
-              fontSize: 12,
+              backgroundColor: PRIMARY_COLOR, // Tombol utama: Hot Pink
+              color: TEXT_LIGHT,
+              fontSize: 14,
               cursor: "pointer",
+              fontWeight: 600,
+              transition: "all 0.3s ease",
               opacity: saving ? 0.7 : 1,
             }}
           >
-            {saving ? "Menyimpan..." : "Simpan"}
+            {saving ? "Menyimpan..." : "Simpan Rekam Medis"}
           </button>
         </div>
       </form>

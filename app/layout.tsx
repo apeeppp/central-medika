@@ -24,7 +24,7 @@ export default function RootLayout({
           <button
             onClick={() => router.back()}
             className="
-              fixed top-4 left-4 z-[999]
+              fixed top-4 left-4 z-999
               bg-black text-white
               rounded-full px-4 py-1
               shadow-lg
